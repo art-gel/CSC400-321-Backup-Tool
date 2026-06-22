@@ -1,0 +1,140 @@
+import pystray, PIL.Image, threading, time, tkinter as tk
+from tkinter import ttk
+from win11toast import toast
+
+
+class BackupState:
+    def __init__(self):
+        self.status = "Idle"
+        self.last_backup = "Never"
+        self.next_backup = "Not Scheduled"
+        self.schedule = "Daily"
+        self.weekday = "Mon"
+        self.hour = "12" # Time settings (AM/PM)
+        self.minute = "00"
+        self.ampm = "AM"
+
+state = BackupState()
+image = PIL.Image.open("backup.jpg")
+
+# Windows toast notifications
+def notify(title, message):
+    toast(title, message, duration="short")
+
+def update_icon(icon):
+    icon.title = (
+        f"3-2-1 Backup Tool\n"
+        f"Status: {state.status}\n"
+        f"Last Backup: {state.last_backup}\n"
+        f"Next Backup: {state.next_backup}"
+    )
+
+# Settings window (Tkinter)
+def open_settings(icon):
+    def save():
+        state.schedule = schedule_var.get()
+        state.weekday = weekday_var.get()
+        state.hour = hour_var.get()
+        state.minute = minute_var.get()
+        state.ampm = ampm_var.get()
+
+        time_str = f"{state.hour}:{state.minute} {state.ampm}"
+
+        # Update next backup display depending on schedule type
+        if state.schedule == "Daily": 
+            state.next_backup = f"Daily at {time_str}"
+        else:
+            state.next_backup = f"Weekly ({state.weekday}) at {time_str}"
+
+        update_icon(icon)
+        window.destroy()
+
+    window = tk.Tk()
+    window.title("Settings")
+    window.geometry("270x220")
+
+    # Schedule
+    tk.Label(window, text="Schedule").pack()
+    schedule_var = tk.StringVar(value=state.schedule)
+    ttk.Combobox(window, textvariable=schedule_var, values=["Daily", "Weekly"]).pack()
+
+    # Weekday
+    tk.Label(window, text="Weekday (Weekly)").pack()
+    weekday_var = tk.StringVar(value=state.weekday)
+    ttk.Combobox(window, textvariable=weekday_var,
+                 values=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]).pack()
+
+    # TIME
+    tk.Label(window, text="Time").pack()
+
+    frame = tk.Frame(window)
+    frame.pack()
+
+    hour_var = tk.StringVar(value=state.hour)
+    minute_var = tk.StringVar(value=state.minute)
+    ampm_var = tk.StringVar(value=state.ampm)
+
+    ttk.Combobox(frame, textvariable=hour_var,
+                 values=[str(i) for i in range(1, 13)], width=3).pack(side="left")
+
+    ttk.Label(frame, text=":").pack(side="left")
+
+    ttk.Combobox(frame, textvariable=minute_var,
+                 values=[f"{i:02d}" for i in range(0, 60)], width=3).pack(side="left")
+
+    ttk.Combobox(frame, textvariable=ampm_var,
+                 values=["AM", "PM"], width=4).pack(side="left")
+
+    tk.Button(window, text="Save", command=save).pack()
+
+    window.mainloop()
+
+
+# Temporary backup simulation
+def run_backup(icon):
+
+    if state.status == "Running":
+        notify("3-2-1 Backup Tool", "A backup is already in progress.")
+        return
+
+    state.status = "Running"
+    update_icon(icon)
+
+    stages = ["Creating Image", "Encrypting", "Uploading to S3", "Finalizing"]
+
+    for stage in stages:
+        time.sleep(2.5)
+
+    state.status = "Idle"
+    state.last_backup = time.strftime("%Y-%m-%d %H:%M:%S")
+
+    update_icon(icon)
+    notify("3-2-1 Backup Tool", "Backup Completed Successfully!")
+
+
+def on_click(icon, item):
+    if str(item) == "Exit":
+        icon.stop()
+
+    elif str(item) == "Run Backup":
+        threading.Thread(target=run_backup, args=(icon,), daemon=True).start()
+
+icon = pystray.Icon(
+    "BackupTool",
+    image,
+    menu=pystray.Menu(
+        pystray.MenuItem("Run Backup", on_click),
+        pystray.MenuItem("Settings",
+            lambda icon, item: threading.Thread(
+                target=open_settings,
+                args=(icon,),
+                daemon=True
+            ).start()
+        ),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem("Exit", on_click)
+    )
+)
+
+update_icon(icon)
+icon.run()
