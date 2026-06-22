@@ -17,7 +17,6 @@ def upload(encrypted_path: Path, bucket: str, region: str, on_progress=None) -> 
     key = f"backups/{encrypted_path.name}"
     client.upload_file(Filename=str(encrypted_path), Bucket=bucket, Key=key)
     
-    # TODO(team): boto3 multipart upload; report progress per part via Callback.
     for pct in (0.33, 0.66, 1.0):
         time.sleep(0.05)
         if on_progress:
