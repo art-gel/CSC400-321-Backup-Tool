@@ -1,6 +1,7 @@
 import pystray, PIL.Image, threading, time
 from win11toast import toast
 from settings_ui import open_settings
+from wbadmin_backup import run_wbadmin_backup
 
 # Backup State
 class BackupState:
@@ -43,7 +44,7 @@ def update_icon(icon):
     )
 
 
-# Backup Simulation
+# Backup 
 def run_backup(icon):
 
     if state.status == "Running":
@@ -53,16 +54,25 @@ def run_backup(icon):
     state.status = "Running"
     update_icon(icon)
 
+    notify("3-2-1 Backup Tool", "Backup Starting")
+
+    source_drive = "C:" #let user choose?
+    target_drive = "E:"
+    returncode = run_wbadmin_backup(target_drive, source_drive)
+    
     stages = ["Creating Image", "Encrypting", "Uploading to S3", "Finalizing"]
 
     for stage in stages:
         time.sleep(2.5)
 
     state.status = "Idle"
-    state.last_backup = time.strftime("%Y-%m-%d %H:%M:%S")
 
     update_icon(icon)
-    notify("3-2-1 Backup Tool", "Backup Completed Successfully!")
+    if returncode == 0:
+        notify("3-2-1 Backup Tool", "Backup Completed Successfully!")
+        state.last_backup = time.strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        notify("3-2-1 Backup Tool", f"Backup failed.")
 
 
 # Tray menu
