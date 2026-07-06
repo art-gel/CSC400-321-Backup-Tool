@@ -6,67 +6,75 @@ from pathlib import Path
 # subprocess allows outside program(wbadmin) to run and listens to it
 # sys tells algorithm which os its currently on
 # path handles file locations
- 
+
 DEFAULT_TARGET = os.environ.get("BACKUP_TARGET", "E:")
 IMAGE_FOLDER_NAME = "WindowsImageBackup"
 PERCENTAGE = re.compile(r"(\d{1,3})%")
 
 # am i runnning on windows? (receptionist)
 def create_image(source_drive: str, on_progress=None, target_drive: str = DEFAULT_TARGET) -> Path:
-   
-    if sys.platform.startswith("windows"):
+
+    if sys.platform == "win32":
         return _create_image_wbadmin(source_drive, on_progress, target_drive)
-    
+
+    raise RuntimeError("wbadmin only exists on Windows. run the imaging stage on Windows machine only!")
+
 
 def _create_image_wbadmin(source_drive, on_progress, target_drive) -> Path:
-   
-   # add more wdamdin controls. create regular backups function
 
-   
+   # add more wdamdin controls. create regular backups function
     cmd = [
-        "wbadmin start backup",
-        f"-addtarget:E:{target_drive}",
-        f"-include:C:{source_drive}",
+        "wbadmin", "start", "backup",
+        f"-backupTarget:{target_drive}",
+        f"-include:{source_drive}",
         "-allCritical",   # specify all critical volumes that are to be included in backup
         "-vssFull",       # perform a full backup using the volume shadow copy service
         "-quiet",         # runs the command automatically/without prompts
     ]
     print("Back up in Process, come back later:", " ".join(cmd))
 
-    
+
     process = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE, # gets programs output/ python can read it
-        stderr=subprocess.STDOUT,   #directs errors to same pipeline as reg messages 
+        stderr=subprocess.STDOUT,   #directs errors to same pipeline as reg messages
         text=True,                  # string format
         bufsize=1,                  # spacing
     )
 
     last_pct = -1
-    assert process.stdout is not None   
+    assert process.stdout is not None
 
     for line in process.stdout:
-        print(line, end="")             
+        print(line, end="")
         match = PERCENTAGE.search(line)
         if match and on_progress:
             pct = min(int(match.group(1)), 100)
-            if pct != last_pct:         
+            if pct != last_pct:
                 last_pct = pct
                 on_progress(pct / 100.0)
 
     returncode = process.wait()
 
-    if returncode == 0 and on_progress(1.0):          
+    
+    if returncode == 0:
+        if on_progress:
+            on_progress(1.0)
         print("Backup completed successfully!")
     else:
         print(f"Backup failed with exit code {returncode}.")
+        
+        raise RuntimeError(f"wbadmin failed with exit code {returncode}")
 
-    return Path(target_drive) / IMAGE_FOLDER_NAME # fix this 
+
+    backup_folder = Path(target_drive) / IMAGE_FOLDER_NAME
+    images = list(backup_folder.rglob("*.vhdx"))
+    if not images:
+        raise RuntimeError("wbadmin finished but no image file was found")
+    newest = max(images, key=lambda p: p.stat().st_mtime)
+    return newest
 
 # add redundancy here#######################
 
 
-#self-testing only
-if __name__ == "__main__":  
-    img = create_image("C:", on_progress=lambda p: print(f"  progress: {p:.0%}"))
-    print("Image at:", img)
+
