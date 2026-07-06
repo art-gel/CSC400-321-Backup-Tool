@@ -1,11 +1,6 @@
-# main.py -- the front door. Start the whole tool with:
-#
-#     uvicorn main:app --reload
-#
-# then open http://127.0.0.1:8000/docs in a browser to click every endpoint.
 
 import uuid
-
+import fastapi
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 
 import pipeline
@@ -32,7 +27,7 @@ def start_backup(request: BackupRequest, background_tasks: BackgroundTasks):
     )
     pipeline.JOBS[job.id] = job
     # 2. run the slow work in the background so this request returns instantly.
-    #    the passphrase is handed straight to the task -- never stored on the job.
+    #    the passphrase is handed straight to the task. never stored on the job.
     background_tasks.add_task(pipeline.run_backup, job.id, request.passphrase)
     # 3. give the user their job (with its id) so they can check on it
     return job
@@ -79,7 +74,4 @@ def schedule_stop():
     scheduler.stop()
     return {"schedule": "stopped"}
 
-# ---- MAKE IT YOURS ----
-# ideas: a GET /jobs endpoint that lists everything on the scoreboard;
-# a DELETE /backup/{id}; bring back the X-API-Key check from your old
-# security.py as a dependency on these routes.
+
