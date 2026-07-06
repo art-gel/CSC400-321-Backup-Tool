@@ -25,8 +25,8 @@ def _create_image_wbadmin(source_drive, on_progress, target_drive) -> Path:
    
     cmd = [
         "wbadmin start backup",
-        f"backup target:{target_drive}",
-        f"-includes the following:{source_drive}",
+        f"-addtarget:E:{target_drive}",
+        f"-include:C:{source_drive}",
         "-allCritical",   # specify all critical volumes that are to be included in backup
         "-vssFull",       # perform a full backup using the volume shadow copy service
         "-quiet",         # runs the command automatically/without prompts
