@@ -74,4 +74,19 @@ def schedule_stop():
     scheduler.stop()
     return {"schedule": "stopped"}
 
+@app.get("/jobs", response_model=list[Job])
+def scoreboard():
+    return  list(pipeline.JOBS.values())
+
+
+@app.delete("/backup/{job_id}") # this route returns one job
+def delete_backup(job_id: str):
+    job = pipeline.JOBS.get(job_id) # look up
+    if job is None or job.kind != "backup": # is it real
+        raise HTTPException(status_code=404, detail="no backup job with that id")
+    if job.status == JobStatus.queued or job.status == JobStatus.uploading: # is it busy 
+        raise HTTPException(status_code=409, detail="id is either running or queued")
+    del pipeline.JOBS[job_id] # delete it
+    return {"job_id":"deleted"} # confirm
+
 
