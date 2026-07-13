@@ -107,7 +107,7 @@ def run_backup(icon):
         return
 
     state.status = "Running"
-    update_icon(icon_instance)
+    update_icon(icon)
     write_log("Backup started")
 
     notify("3-2-1 Backup Tool", "Backup Starting")
@@ -127,21 +127,15 @@ def run_backup(icon):
 
     update_icon(icon)
     if returncode == 0:
-        notify("3-2-1 Backup Tool", "Backup Completed Successfully!")
         state.last_backup = time.strftime("%Y-%m-%d %H:%M:%S")
+        notify("3-2-1 Backup Tool", "Backup Completed Successfully!")
     else:
-        notify("3-2-1 Backup Tool", f"Backup failed.")
-
-    notify(
-        "3-2-1 Backup Tool",
-        "Backup Completed Successfully!"
-    )
+        notify("3-2-1 Backup Tool", "Backup failed.")
 
 def on_click(icon_instance, item):
     if str(item) == "Exit":
         icon_instance.stop()
-        # root.quit() must be called on the thread that owns the Tk mainloop,
-        # so hand it off via after() rather than calling it directly here.
+
         root.after(0, root.quit)
     elif str(item) == "Run Backup Now":  # Start backup in a separate thread
         threading.Thread(target=run_backup, args=(icon_instance,), daemon=True).start()
@@ -155,24 +149,15 @@ def open_logs(icon_instance, item):
         os.startfile(LOG_FILE)
 
 def launch_settings_from_menu(icon_instance, item):
-    # IMPORTANT: pystray runs menu callbacks on its own worker thread, not the
-    # main thread. Tkinter/CTk widgets may only be created or touched on the
-    # thread that owns the mainloop, so we hand this off with root.after(0, ...)
-    # instead of calling open_settings() directly here.
     root.after(0, lambda: open_settings(icon_instance, state, update_icon, root))
 
-# ---- Single persistent Tk root for the entire app lifetime ----
-# Only ONE ctk.CTk() root should ever exist. Settings windows are opened as
-# CTkToplevel(root) instances, never as additional CTk() roots.
 root = ctk.CTk()
 root.withdraw()  # this root is never shown directly
 
 has_config = load_state_into_app()
 
 if not has_config:
-    # First-time configuration run - block here until the user saves/cancels.
-    # wait_window() runs a local (nested) event loop and works even though
-    # root.mainloop() hasn't started yet.
+    # First-time configuration run
     open_settings(None, state, update_icon, root, modal_wait=True)
     if not os.path.exists(CONFIG_FILE):
         print("Setup canceled. Exiting tool.")
@@ -195,11 +180,7 @@ icon = pystray.Icon(
 rebuild_next_backup()
 update_icon(icon)
 
-def launch_settings_first():
-    open_settings(icon, state, update_icon)
-
-
-# This will launch the settings window on the first launch
-threading.Thread(target=launch_settings_first, daemon=True).start()
-
-icon.run()
+# Run the tray icon's event loop on a background thread, and keep Tkinter's
+# mainloop on the main thread. 
+threading.Thread(target=icon.run, daemon=True).start()
+root.mainloop()
