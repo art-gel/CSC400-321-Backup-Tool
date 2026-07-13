@@ -6,10 +6,6 @@ from CTkToolTip import CTkToolTip
 
 def open_settings(icon, state, update_icon, root, modal_wait=False):
 
-    # Use a CTkToplevel of the single persistent root instead of a second
-    # ctk.CTk() instance. Multiple CTk() roots is what caused the
-    # "main thread is not in main loop" / "invalid command name ... after
-    # script" errors and the laggy tab switching.
     app = ctk.CTkToplevel(root)
     app.geometry("500x420")
     app.title("3-2-1 Backup Tool Settings")
@@ -18,8 +14,6 @@ def open_settings(icon, state, update_icon, root, modal_wait=False):
     except:
         pass
     app.resizable(False, False)
-
-    # Make it behave like a modal dialog
     app.transient(root)
     app.grab_set()
     app.focus_force()
@@ -191,7 +185,7 @@ def open_settings(icon, state, update_icon, root, modal_wait=False):
 
         return False
 
-    # Register these validation rules with Tkinter
+    # Validation commands for hour and minute entries
     v_hour = app.register(validate_hour)
     v_minute = app.register(validate_minute)
 
@@ -221,7 +215,7 @@ def open_settings(icon, state, update_icon, root, modal_wait=False):
     toggle_weekday()
 
     ctk.CTkLabel(tab3, text="Time").pack(pady=(10, 5))
-    time_frame = ctk.CTkFrame(tab3, fg_color="transparent")  # Transparent frame matches tab perfectly
+    time_frame = ctk.CTkFrame(tab3, fg_color="transparent")
     time_frame.pack(pady=5)
 
     hour_entry = ctk.CTkEntry(
@@ -319,7 +313,5 @@ def open_settings(icon, state, update_icon, root, modal_wait=False):
 
     if modal_wait:
         # Only needed for the very first run, called before root.mainloop()
-        # has started. wait_window() runs its own local event loop and
-        # returns once `app` is destroyed - it does NOT require (or create)
-        # a second Tk root, unlike the old app.mainloop() approach.
+        # has started. 
         root.wait_window(app)
