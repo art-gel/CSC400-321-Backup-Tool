@@ -2,6 +2,7 @@ import pystray, PIL.Image, threading, time, os, json
 import customtkinter as ctk
 from win11toast import toast
 from settings_ui import open_settings
+from wbadmin_backup import run_wbadmin_backup
 
 ctk.set_appearance_mode("Dark")
 
@@ -97,8 +98,10 @@ def update_icon(icon_instance):
         f"Next Backup: {state.next_backup}"
     )
 
-# Simulates the backup workflow
-def run_backup(icon_instance):
+
+# Backup 
+def run_backup(icon):
+
     if state.status == "Running":
         notify("3-2-1 Backup Tool", "A backup is already in progress.")
         return
@@ -107,12 +110,13 @@ def run_backup(icon_instance):
     update_icon(icon_instance)
     write_log("Backup started")
 
-    stages = [
-        "Creating Image",
-        "Encrypting",
-        "Uploading to S3",
-        "Finalizing"
-    ]
+    notify("3-2-1 Backup Tool", "Backup Starting")
+
+    source_drive = "C:" #let user choose?
+    target_drive = "E:"
+    returncode = run_wbadmin_backup(target_drive, source_drive)
+    
+    stages = ["Creating Image", "Encrypting", "Uploading to S3", "Finalizing"]
 
     for stage in stages:
         write_log(f"{stage} started")
@@ -120,11 +124,13 @@ def run_backup(icon_instance):
         write_log(f"{stage} completed")
 
     state.status = "Idle"
-    state.last_backup = time.strftime("%Y-%m-%d %H:%M:%S")
 
-    save_config()
-    update_icon(icon_instance)
-    write_log("Backup completed successfully")
+    update_icon(icon)
+    if returncode == 0:
+        notify("3-2-1 Backup Tool", "Backup Completed Successfully!")
+        state.last_backup = time.strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        notify("3-2-1 Backup Tool", f"Backup failed.")
 
     notify(
         "3-2-1 Backup Tool",
@@ -189,9 +195,11 @@ icon = pystray.Icon(
 rebuild_next_backup()
 update_icon(icon)
 
-# Run the tray icon's event loop on a background thread, and keep Tkinter's
-# mainloop on the main thread. Tkinter is not thread-safe and must own the
-# main thread for the whole program's lifetime - this is what fixes both the
-# "main thread is not in main loop" crash and the tab-switching lag.
-threading.Thread(target=icon.run, daemon=True).start()
-root.mainloop()
+def launch_settings_first():
+    open_settings(icon, state, update_icon)
+
+
+# This will launch the settings window on the first launch
+threading.Thread(target=launch_settings_first, daemon=True).start()
+
+icon.run()
