@@ -2,6 +2,7 @@ import pystray, PIL.Image, threading, time, os, json
 import customtkinter as ctk
 from win11toast import toast
 from settings_ui import open_settings
+from wbadmin_backup import run_wbadmin_backup
 
 ctk.set_appearance_mode("Dark")
 
@@ -97,22 +98,25 @@ def update_icon(icon_instance):
         f"Next Backup: {state.next_backup}"
     )
 
-# Simulates the backup workflow
-def run_backup(icon_instance):
+
+# Backup 
+def run_backup(icon):
+
     if state.status == "Running":
         notify("3-2-1 Backup Tool", "A backup is already in progress.")
         return
 
     state.status = "Running"
-    update_icon(icon_instance)
+    update_icon(icon)
     write_log("Backup started")
 
-    stages = [
-        "Creating Image",
-        "Encrypting",
-        "Uploading to S3",
-        "Finalizing"
-    ]
+    notify("3-2-1 Backup Tool", "Backup Starting")
+
+    source_drive = "C:" #let user choose?
+    target_drive = "E:"
+    returncode = run_wbadmin_backup(target_drive, source_drive)
+    
+    stages = ["Creating Image", "Encrypting", "Uploading to S3", "Finalizing"]
 
     for stage in stages:
         write_log(f"{stage} started")
@@ -120,16 +124,13 @@ def run_backup(icon_instance):
         write_log(f"{stage} completed")
 
     state.status = "Idle"
-    state.last_backup = time.strftime("%Y-%m-%d %H:%M:%S")
 
-    save_config()
-    update_icon(icon_instance)
-    write_log("Backup completed successfully")
-
-    notify(
-        "3-2-1 Backup Tool",
-        "Backup Completed Successfully!"
-    )
+    update_icon(icon)
+    if returncode == 0:
+        state.last_backup = time.strftime("%Y-%m-%d %H:%M:%S")
+        notify("3-2-1 Backup Tool", "Backup Completed Successfully!")
+    else:
+        notify("3-2-1 Backup Tool", "Backup failed.")
 
 def on_click(icon_instance, item):
     if str(item) == "Exit":
