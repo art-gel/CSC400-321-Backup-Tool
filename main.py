@@ -4,16 +4,19 @@ import fastapi
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 
 import pipeline
-import scheduler
+from scheduler import Scheduler
 from models import BackupRequest, RestoreRequest, Job, JobStatus
+import os
 
 app = FastAPI(title="3-2-1 Backup Tool")
 
+script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "notify_windows.py") # change notify_windows.py to WBAdmin_Script.py?
+scheduler = Scheduler("321BackupTool", script_path=script_path)
 
 @app.get("/health")
 def health():
     # quick "is the server alive?" check
-    return {"status": "ok", "scheduler_running": scheduler.is_running}
+    return {"status": "ok", "scheduler_running": scheduler.is_running()}
 
 
 @app.post("/backup", response_model=Job)
