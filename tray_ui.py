@@ -3,6 +3,7 @@ import customtkinter as ctk
 from win11toast import toast
 from settings_ui import open_settings
 from wbadmin_backup import run_wbadmin_backup
+from WBAdmin_Script import  create_image, _create_image_wbadmin
 
 ctk.set_appearance_mode("Dark")
 
