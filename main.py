@@ -1,10 +1,15 @@
 
 import uuid
-import fastapi
+import os
+from typing import Optional
 from fastapi import FastAPI, BackgroundTasks, HTTPException
-
 import pipeline
+<<<<<<< HEAD
 from scheduler import Scheduler
+=======
+import scheduler2 import Scheduler
+from config import get_settings
+>>>>>>> 7145662 (some changes to main)
 from models import BackupRequest, RestoreRequest, Job, JobStatus
 import os
 
@@ -12,6 +17,10 @@ app = FastAPI(title="3-2-1 Backup Tool")
 
 script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "notify_windows.py") # change notify_windows.py to WBAdmin_Script.py?
 scheduler = Scheduler("321BackupTool", script_path=script_path)
+
+TASK_NAME = "321BackupTool"
+RUNNER_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run_scheduled_backup.py")
+scheduler = Scheduler(TASK_NAME, script_path=RUNNER_SCRIPT)
 
 @app.get("/health")
 def health():
@@ -65,17 +74,6 @@ def get_restore(job_id: str):
     return job
 
 
-@app.post("/schedule/start")
-def schedule_start():
-    # turn on set-and-forget automatic backups
-    scheduler.start()
-    return {"schedule": "started"}
-
-
-@app.post("/schedule/stop")
-def schedule_stop():
-    scheduler.stop()
-    return {"schedule": "stopped"}
 
 @app.get("/jobs", response_model=list[Job])
 def scoreboard():
@@ -93,3 +91,39 @@ def delete_backup(job_id: str):
     return {"job_id":"deleted"} # confirm
 
 
+@app.post("/schedule/start")
+def schedule_start(minutes: Optional[int] = None):
+    # turn on set-and-forget automatic backups.
+    # leave minutes empty to use BACKUP_SCHEDULE_MINUTES from config.
+    # safe to call twice: it overwrites the old task.
+    every = minutes if minutes else get_settings().schedule_minutes
+    if not scheduler.start(min=every):
+        raise HTTPException(status_code=500, detail="could not create the task (needs Windows + admin)")
+    return {"schedule": "started", "every_minutes": every}
+ 
+ 
+@app.get("/schedule")
+def schedule_status():
+    # {'exists': bool, 'status': 'Ready' | 'Running' | 'Disabled' | 'Queued' | None}
+    return scheduler.get_status()
+ 
+ 
+@app.post("/schedule/stop")
+def schedule_stop():
+    # pause it. the task stays on the machine -- use /schedule/enable to resume.
+    if not scheduler.exists():
+        raise HTTPException(status_code=404, detail="no scheduled task")
+    if not scheduler.disable():
+        raise HTTPException(status_code=500, detail="could not stop the task")
+    return {"schedule": "stopped"}
+ 
+ 
+@app.post("/schedule/enable")
+def schedule_enable():
+    # un-pause it.
+    if not scheduler.exists():
+        raise HTTPException(status_code=404, detail="no scheduled task")
+    if not scheduler.enable():
+        raise HTTPException(status_code=500, detail="could not enable the task")
+    return {"schedule": "enabled"}
+ 
