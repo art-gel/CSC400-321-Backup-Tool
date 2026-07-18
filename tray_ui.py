@@ -4,6 +4,7 @@ from win11toast import toast
 from settings_ui import open_settings
 from WBAdmin_Script import  create_image
 from scheduler import Scheduler
+from storage import upload_backup
 
 ctk.set_appearance_mode("Dark")
 
@@ -133,12 +134,29 @@ def run_backup(icon):
 
     source_drive = "C:" #let user choose?
     target_drive = state.storage_path[:2]
+    success = True
     try:
         create_image(source_drive=source_drive, target_drive=target_drive)
         state.last_backup = time.strftime("%Y-%m-%d %H:%M:%S")
         notify("3-2-1 Backup Tool", "Backup Completed Successfully!")
     except:
+        success = False
         notify("3-2-1 Backup Tool", "Backup failed.")
+
+    if success:
+        #try:
+        if True:
+            upload_backup(target_drive=target_drive, 
+                aws_access_key_id=state.aws_access_key, 
+                aws_secret_access_key=state.aws_secret_key, 
+                region_name="us-east-1",                   # set in UI
+                bucket_name=state.s3_bucket_name, 
+                endpoint_url="http://10.0.0.108:4566")     # set in UI
+
+            notify("3-2-1 Backup Tool", "Backup Uploaded to Cloud!")
+        #except:
+         #   notify("3-2-1 Backup Tool", "Cloud Upload Failed!")
+
 
     stages = ["Creating Image", "Encrypting", "Uploading to S3", "Finalizing"]
 
@@ -148,7 +166,7 @@ def run_backup(icon):
         write_log(f"{stage} completed")
 
     state.status = "Idle"
-    update_icon(icon)
+    update_icon(icon) 
 
 def on_click(icon_instance, item):
     if str(item) == "Exit":

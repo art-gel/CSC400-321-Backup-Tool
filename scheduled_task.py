@@ -1,6 +1,7 @@
 from WBAdmin_Script import create_image
 import os, json, sys, time
 from win11toast import toast
+from storage import upload_backup
 
 '''
 This script will be called from the task scheduler and run the backup task
@@ -43,6 +44,8 @@ hour = config.get("hour", "12")
 minute = config.get("minute", "00")
 ampm = config.get("ampm", "AM")
 last_backup = config.get("last_backup", "Never")
+region_name = config.get("region_name", "us-east-1")
+endpoint_url = config.get("endpoint_url", "http://10.0.0.108:4566")
 
 source_drive = "C:" #let user choose?
 target_drive = storage_path[:2]
@@ -70,7 +73,15 @@ try:
         json.dump(config, f, indent=4)
 
     notify("3-2-1 Backup Tool", "Backup Completed Successfully!")
+    
+    upload_backup(target_drive=target_drive, 
+        aws_access_key_id=aws_access_key, 
+        aws_secret_access_key=aws_secret_key, 
+        region_name=region_name, 
+        bucket_name=s3_bucket_name, 
+        endpoint_url=endpoint_url)
 
+    notify("3-2-1 Backup Tool", "Backup Uploaded to Cloud!")
 
 except Exception as e:
     notify("3-2-1 Backup Tool", "Backup Failed")
