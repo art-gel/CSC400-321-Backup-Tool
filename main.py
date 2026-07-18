@@ -1,11 +1,11 @@
-
+import tray_ui as ui # keep this as first import
 import uuid
 import os
 from typing import Optional
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 import pipeline
 from scheduler import Scheduler
-# from config import get_settings
+from config import get_settings
 from models import BackupRequest, RestoreRequest, Job, JobStatus
 import os
 

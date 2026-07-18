@@ -1,7 +1,7 @@
 
 
 import WBAdmin_Script
-# import encryption
+import encryption
 import storage
 from config import get_settings
 from models import JobStatus

@@ -2,7 +2,6 @@ import pystray, PIL.Image, threading, time, os, json
 import customtkinter as ctk
 from win11toast import toast
 from settings_ui import open_settings
-from wbadmin_backup import run_wbadmin_backup
 from WBAdmin_Script import  create_image, _create_image_wbadmin
 
 ctk.set_appearance_mode("Dark")
@@ -114,9 +113,14 @@ def run_backup(icon):
     notify("3-2-1 Backup Tool", "Backup Starting")
 
     source_drive = "C:" #let user choose?
-    target_drive = "E:"
-    returncode = run_wbadmin_backup(target_drive, source_drive)
-    
+    target_drive = state.storage_path[:2]
+    try:
+        create_image(source_drive=source_drive, target_drive=target_drive)
+        state.last_backup = time.strftime("%Y-%m-%d %H:%M:%S")
+        notify("3-2-1 Backup Tool", "Backup Completed Successfully!")
+    except:
+        notify("3-2-1 Backup Tool", "Backup failed.")
+
     stages = ["Creating Image", "Encrypting", "Uploading to S3", "Finalizing"]
 
     for stage in stages:
@@ -125,13 +129,7 @@ def run_backup(icon):
         write_log(f"{stage} completed")
 
     state.status = "Idle"
-
     update_icon(icon)
-    if returncode == 0:
-        state.last_backup = time.strftime("%Y-%m-%d %H:%M:%S")
-        notify("3-2-1 Backup Tool", "Backup Completed Successfully!")
-    else:
-        notify("3-2-1 Backup Tool", "Backup failed.")
 
 def on_click(icon_instance, item):
     if str(item) == "Exit":
@@ -155,33 +153,37 @@ def launch_settings_from_menu(icon_instance, item):
 root = ctk.CTk()
 root.withdraw()  # this root is never shown directly
 
-has_config = load_state_into_app()
+def main():
+    has_config = load_state_into_app()
 
-if not has_config:
-    # First-time configuration run
-    open_settings(None, state, update_icon, root, modal_wait=True)
-    if not os.path.exists(CONFIG_FILE):
-        print("Setup canceled. Exiting tool.")
-        exit()
-    load_state_into_app()
+    if not has_config:
+        # First-time configuration run
+        open_settings(None, state, update_icon, root, modal_wait=True)
+        if not os.path.exists(CONFIG_FILE):
+            print("Setup canceled. Exiting tool.")
+            exit()
+        load_state_into_app()
 
-# Initialize the system tray icon
-icon = pystray.Icon(
-    "BackupTool",
-    image,
-    menu=pystray.Menu(
-        pystray.MenuItem("Run Backup Now", on_click),
-        pystray.MenuItem("Settings", launch_settings_from_menu),
-        pystray.MenuItem("View Logs", open_logs),
-        pystray.Menu.SEPARATOR,
-        pystray.MenuItem("Exit", on_click)
+    # Initialize the system tray icon
+    icon = pystray.Icon(
+        "BackupTool",
+        image,
+        menu=pystray.Menu(
+            pystray.MenuItem("Run Backup Now", on_click),
+            pystray.MenuItem("Settings", launch_settings_from_menu),
+            pystray.MenuItem("View Logs", open_logs),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Exit", on_click)
+        )
     )
-)
 
-rebuild_next_backup()
-update_icon(icon)
+    rebuild_next_backup()
+    update_icon(icon)
 
-# Run the tray icon's event loop on a background thread, and keep Tkinter's
-# mainloop on the main thread. 
-threading.Thread(target=icon.run, daemon=True).start()
-root.mainloop()
+    # Run the tray icon's event loop on a background thread, and keep Tkinter's
+    # mainloop on the main thread. 
+    threading.Thread(target=icon.run, daemon=True).start()
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
