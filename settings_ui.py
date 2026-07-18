@@ -371,7 +371,7 @@ def open_settings(icon, state, update_icon, root, modal_wait=False):
 
         state.schedule = schedule_var.get()
         state.weekday = weekday_var.get()
-        state.hour = hour_entry.get().zfill(2)
+        state.hour = hour_entry.get().strip().lstrip("0") or "12"
         state.minute = minute_entry.get().zfill(2)
         state.ampm = ampm_var.get()
 
