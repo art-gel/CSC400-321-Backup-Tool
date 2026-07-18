@@ -4,12 +4,8 @@ import os
 from typing import Optional
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 import pipeline
-<<<<<<< HEAD
 from scheduler import Scheduler
-=======
-import scheduler2 import Scheduler
-from config import get_settings
->>>>>>> 7145662 (some changes to main)
+# from config import get_settings
 from models import BackupRequest, RestoreRequest, Job, JobStatus
 import os
 

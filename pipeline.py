@@ -1,7 +1,7 @@
 
 
 import WBAdmin_Script
-import encryption
+# import encryption
 import storage
 from config import get_settings
 from models import JobStatus
@@ -27,7 +27,7 @@ def run_backup(job_id, passphrase):
         # stage 2: lock the image with the passphrase
         job.status = JobStatus.encrypting
         job.progress = 0.25
-        enc_path = encryption.encrypt_file(image_path, passphrase)
+        # enc_path = encryption.encrypt_file(image_path, passphrase)
         print("Stage 2:(in-Progress) - Encrypting image file with passphrase")
 
         # stage 3: send the LOCKED file to S3
@@ -61,7 +61,7 @@ def run_restore(job_id, passphrase):
         # stage 1: pull the locked file back down from S3
         job.status = JobStatus.downloading
         job.progress = 0.0
-        enc_path = storage.download(job.s3_key, settings.s3_bucket, settings.aws_region)
+        # enc_path = storage.download(job.s3_key, settings.s3_bucket, settings.aws_region)
         print("file from S3 buckeet is being downloaded")
 
         # stage 2: unlock it (fails loudly if the passphrase is wrong)
