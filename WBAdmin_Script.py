@@ -78,3 +78,9 @@ def _create_image_wbadmin(source_drive, on_progress, target_drive) -> Path:
 
 
 
+if __name__ == "__main__":
+    from win11toast import toast
+    
+    toast("3-2-1 Backup Tool", "Backup Starting", duration="short")
+    time.sleep(5)
+    toast("3-2-1 Backup Tool", "Backup Completed Successfully!", duration="short")

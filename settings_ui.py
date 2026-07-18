@@ -3,6 +3,7 @@ import json, os, shutil, win32api, win32file
 from tkinter import messagebox
 from PIL import Image
 from CTkToolTip import CTkToolTip
+from scheduler import Scheduler
 
 def open_settings(icon, state, update_icon, root, modal_wait=False):
 
@@ -300,6 +301,22 @@ def open_settings(icon, state, update_icon, root, modal_wait=False):
             "ampm": state.ampm,
             "last_backup": state.last_backup
         }
+
+        # update task scheduler
+        print("Creating Task..")
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scheduled_task.py")
+        task = Scheduler("321BackupTool", script_path=script_path)
+        result = task.start(
+            schedule=state.schedule,
+            weekday=state.weekday,
+            hour=state.hour,
+            minute=state.minute,
+            ampm=state.ampm,)
+        if result:
+            print("Task created successfully.")
+        else:
+            print("Failed to create task.")
+
         with open("backup_config.json", "w") as f:
             json.dump(config_data, f, indent=4)
 
