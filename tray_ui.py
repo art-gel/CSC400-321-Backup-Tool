@@ -3,6 +3,7 @@ import customtkinter as ctk
 from win11toast import toast
 from settings_ui import open_settings
 from WBAdmin_Script import  create_image, _create_image_wbadmin
+from scheduler import Scheduler
 
 ctk.set_appearance_mode("Dark")
 
@@ -51,6 +52,24 @@ def save_config():
     }
     with open(CONFIG_FILE, "w") as f:
         json.dump(config, f, indent=4)
+
+    update_schedule()
+
+def update_schedule():
+    print("Creating Task..")
+    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "WBAdmin_Script.py")
+    task = Scheduler("321BackupTool", script_path=script_path)
+    result = task.start(
+        schedule=state.schedule,
+        weekday=state.weekday,
+        hour=state.hour,
+        minute=state.minute,
+        ampm=state.ampm,)
+    if result:
+        print("Task created successfully.")
+    else:
+        print("Failed to create task.")
+
 
 def load_state_into_app():
     config = load_config()

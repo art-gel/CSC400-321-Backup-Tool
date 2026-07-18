@@ -60,15 +60,30 @@ class Scheduler:
                     break
         return {'exists': found, 'status': status}
 
-    def start(self, min=2):
-        # Creates a scheduled task that runs the given script every 'min' minutes
+    def start(self, schedule="Daily", weekday="Mon", hour="12", minute="00", ampm="AM"):
+        # Convert 12-hour (+AM/PM) into 24-hour time for schtasks' /st flag
+        start_time = self._to_24hr(hour, minute, ampm)
+
         cmd = [
             'schtasks', '/create', '/tn', self.task_name,
             '/tr', f'"{self.python_exe}" "{self.script_path}"',
-            '/sc', 'minute', '/mo', str(min),
             '/f',   # overwrite if it already exists, so calling start twice is safe
         ]
+
+        if schedule == "Daily":
+            cmd += ['/sc', 'daily', '/st', start_time]
+        else:  # "Weekly"
+            # schtasks wants weekday abbreviations like MON, TUE, WED...
+            cmd += ['/sc', 'weekly', '/d', weekday.upper()[:3], '/st', start_time]
+
         return self._run(cmd).returncode == 0
+
+    @staticmethod
+    def _to_24hr(hour, minute, ampm):
+        h = int(hour) % 12
+        if ampm.upper() == "PM":
+            h += 12
+        return f"{h:02d}:{int(minute):02d}"
 
     def disable(self):
         # pause the task. it stays on the machine and can be turned back on.
@@ -89,7 +104,7 @@ class Scheduler:
 
 if __name__ == "__main__":
     # manual test: create the real task, then offer to remove it.
-    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run_scheduled_backup.py")
+    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "WBAdmin_Script.py")
     scheduler = Scheduler("321BackupTool", script_path=script_path)
 
     if not scheduler.exists():
