@@ -67,7 +67,8 @@ class Scheduler:
         cmd = [
             'schtasks', '/create', '/tn', self.task_name,
             '/tr', f'"{self.python_exe}" "{self.script_path}"',
-            '/f',   # overwrite if it already exists, so calling start twice is safe
+            '/rl', 'HIGHEST',   # run with admin privileges
+            '/f',
         ]
 
         if schedule == "Daily":
@@ -104,7 +105,7 @@ class Scheduler:
 
 if __name__ == "__main__":
     # manual test: create the real task, then offer to remove it.
-    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "WBAdmin_Script.py")
+    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scheduled_task.py")
     scheduler = Scheduler("321BackupTool", script_path=script_path)
 
     if not scheduler.exists():

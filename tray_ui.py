@@ -2,7 +2,7 @@ import pystray, PIL.Image, threading, time, os, json
 import customtkinter as ctk
 from win11toast import toast
 from settings_ui import open_settings
-from WBAdmin_Script import  create_image, _create_image_wbadmin
+from WBAdmin_Script import  create_image
 from scheduler import Scheduler
 
 ctk.set_appearance_mode("Dark")
@@ -57,7 +57,7 @@ def save_config():
 
 def update_schedule():
     print("Creating Task..")
-    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "WBAdmin_Script.py")
+    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scheduled_task.py")
     task = Scheduler("321BackupTool", script_path=script_path)
     result = task.start(
         schedule=state.schedule,

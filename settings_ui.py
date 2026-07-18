@@ -304,7 +304,7 @@ def open_settings(icon, state, update_icon, root, modal_wait=False):
 
         # update task scheduler
         print("Creating Task..")
-        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "WBAdmin_Script.py")
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scheduled_task.py")
         task = Scheduler("321BackupTool", script_path=script_path)
         result = task.start(
             schedule=state.schedule,
