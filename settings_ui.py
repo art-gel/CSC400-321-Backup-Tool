@@ -1,5 +1,5 @@
 import customtkinter as ctk
-import json, os, shutil, win32api, win32file
+import json, os, shutil, win32api, win32file, re
 from tkinter import messagebox
 from PIL import Image
 from CTkToolTip import CTkToolTip
@@ -8,7 +8,7 @@ from scheduler import Scheduler
 def open_settings(icon, state, update_icon, root, modal_wait=False):
 
     app = ctk.CTkToplevel(root)
-    app.geometry("500x420")
+    app.geometry("560x430")
     app.title("3-2-1 Backup Tool Settings")
     try:
         app.iconbitmap("backup.ico")
@@ -41,9 +41,42 @@ def open_settings(icon, state, update_icon, root, modal_wait=False):
     aws_key.pack(pady=(0, 10))
 
     ctk.CTkLabel(tab1, text="AWS Secret Access Key").pack(anchor="w", padx=20)
-    aws_secret = ctk.CTkEntry(tab1, width=350, show="*")
+
+    secret_frame = ctk.CTkFrame(tab1, fg_color="transparent")
+    secret_frame.pack(pady=(0, 10))
+
+    aws_secret = ctk.CTkEntry(secret_frame, width=307, show="*")
     aws_secret.insert(0, getattr(state, "aws_secret_key", ""))
-    aws_secret.pack(pady=(0, 10))
+    aws_secret.pack(side="left")
+
+    # Toggle for secret visibility
+    secret_visible = False
+
+    eye_open = ctk.CTkImage(Image.open("visibility_on.png"), size=(20, 20))
+    eye_closed = ctk.CTkImage(Image.open("visibility_off.png"), size=(20, 20))
+
+    def toggle_secret():
+        nonlocal secret_visible
+
+        if secret_visible:
+            aws_secret.configure(show="*")
+            eye_btn.configure(image=eye_closed)
+        else:
+            aws_secret.configure(show="")
+            eye_btn.configure(image=eye_open)
+
+        secret_visible = not secret_visible
+
+    eye_btn = ctk.CTkButton(
+    secret_frame,
+    text="",
+    image=eye_closed,
+    width=36,
+    fg_color="transparent",
+    hover_color=("gray80", "gray30"),
+    command=toggle_secret
+)
+    eye_btn.pack(side="left", padx=(6, 0))
 
     ctk.CTkLabel(tab1, text="S3 Bucket Name").pack(anchor="w", padx=20)
     bucket = ctk.CTkEntry(tab1, width=350)
@@ -62,6 +95,7 @@ def open_settings(icon, state, update_icon, root, modal_wait=False):
 
     stats_label = ctk.CTkLabel(storage_frame, text="", font=("Arial", 14))
 
+    # Scan for connected drives
     def detect_drives():
         drives = []
         system_drive = os.environ["SystemDrive"].upper()
@@ -87,13 +121,14 @@ def open_settings(icon, state, update_icon, root, modal_wait=False):
 
         return drives
 
+    # Format storage size
     def format_storage(size):
         gb = size / (1024**3)
         if gb >= 1024:
             return f"{gb / 1024:.2f} TB"
         else:
             return f"{gb:.2f} GB"
-
+    # Update storage statistics
     def update_stats():
         selected = storage_path.get()
         drive = drive_map.get(selected)
@@ -203,7 +238,8 @@ def open_settings(icon, state, update_icon, root, modal_wait=False):
 
     weekday_menu = ctk.CTkOptionMenu(
         tab3, variable=weekday_var, values=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])
-
+    
+    # Toggle weekday menu based on schedule type
     def toggle_weekday(*args):
         if schedule_var.get() == "Weekly":
             day_label.pack(pady=(5, 0))
@@ -277,6 +313,62 @@ def open_settings(icon, state, update_icon, root, modal_wait=False):
                                   message="Please complete all required fields before saving.")
             return
 
+        # Access Keys are alphanumeric strings precisely 20 characters long, usually starting with AKIA
+        aws_access_key_val = aws_key.get().strip()
+        if not re.match(r"^[A-Z0-9]{20}$", aws_access_key_val):
+            messagebox.showerror(
+                title="Invalid Access Key", 
+                message="AWS Access Key must be exactly 20 uppercase alphanumeric characters."
+            )
+            return
+        
+        if len(set(aws_access_key_val)) == 1:
+            messagebox.showerror(
+                title="Invalid Access Key", 
+                message="AWS Access Key cannot consist of the same repeating character."
+            )
+            return
+
+        # Secret Access Keys are 40-character base64-like strings
+        aws_secret_key_val = aws_secret.get().strip()
+        if not re.match(r"^[A-Za-z0-9/+=]{40}$", aws_secret_key_val):
+            messagebox.showerror(
+                title="Invalid Secret Key", 
+                message="AWS Secret Access Key must be exactly 40 characters long."
+            )
+            return
+
+        # S3 Bucket guidelines:
+        # - Between 3 and 63 characters long
+        # - Lowercase letters, numbers, dots, and hyphens only
+        # - Must start and end with a letter or number
+        # - Cannot contain consecutive periods or look like an IP address
+        bucket_val = bucket.get().strip()
+        
+        # Check overall allowed characters and length
+        if not re.match(r"^[a-z0-9.-]{3,63}$", bucket_val):
+            messagebox.showerror(
+                title="Invalid Bucket Name", 
+                message="S3 Bucket name must be between 3 and 63 characters, and contain " \
+                "only lowercase letters, numbers, hyphens, and periods."
+            )
+            return
+        
+        # Check starting and ending conditions
+        if not (bucket_val[0].isalnum() and bucket_val[-1].isalnum()):
+            messagebox.showerror(
+                title="Invalid Bucket Name", 
+                message="S3 Bucket name must start and end with a lowercase letter or a number."
+            )
+            return
+
+        # Check for consecutive periods
+        if ".." in bucket_val:
+            messagebox.showerror(
+                title="Invalid Bucket Name", 
+                message="S3 Bucket name cannot contain consecutive periods (..)."
+            )
+
         state.schedule = schedule_var.get()
         state.weekday = weekday_var.get()
         state.hour = hour_entry.get().zfill(2)
@@ -325,7 +417,7 @@ def open_settings(icon, state, update_icon, root, modal_wait=False):
 
         on_close()
 
-    save_btn = ctk.CTkButton(app, text="Save Settings", command=save_settings)
+    save_btn = ctk.CTkButton(app, text="Save", command=save_settings)
     save_btn.pack(pady=(0, 15))
 
     if modal_wait:
