@@ -1,4 +1,4 @@
-import boto3, os
+import boto3, os, math
 from pathlib import Path
 # from config import get_settings
 from botocore.exceptions import ClientError
@@ -51,6 +51,7 @@ def create_bucket(s3_client, bucket_name):
             # If it's a 403 (Forbidden) or other error, re-raise it
             raise e
 
+PART_SIZE = 1024 * 1024 * 64  # 64MB
 
 def upload_backup(target_drive, aws_access_key_id, aws_secret_access_key, region_name, bucket_name, endpoint_url):
     '''
@@ -85,9 +86,9 @@ def upload_backup(target_drive, aws_access_key_id, aws_secret_access_key, region
     # Configure the transfer
     # 64MB threshold for multipart, 3 threads for parallel uploads
     transfer_config = TransferConfig(
-        multipart_threshold=1024 * 1024 * 64, 
+        multipart_threshold=PART_SIZE, 
         max_concurrency=3,
-        multipart_chunksize=1024 * 1024 * 64,
+        multipart_chunksize=PART_SIZE,
         use_threads=True
     )
     
@@ -99,11 +100,84 @@ def upload_backup(target_drive, aws_access_key_id, aws_secret_access_key, region
 
             s3_key = f"WindowsImageBackup/{relative_path}".replace("\\", "/")
             
-            s3_client.upload_file(
-                local_path, 
-                bucket_name, 
-                s3_key,
-                Config=transfer_config
-            )
-            print(f"Uploading.. {s3_key} completed")
+            upload_one_file(s3_client, local_path, bucket_name, s3_key)
+
     print("All uploads complete.")
+
+
+def upload_one_file(s3_client, local_path, bucket_name, s3_key):
+    '''
+    Uploads a single file, splitting it into parts (multipart upload) and
+    resuming from wherever a previous attempt left off, if any.
+    
+    Notes:
+    LocalStack shows an example of S3 storage backend in its file
+    structure. <localstack folder>/state/s3/<bucket name> should have a
+    folder for oversized files that contains the numbered parts of the 
+    files. We will force all files to behave that way (broken into parts) 
+    and ask if a part already exists before trying to upload it. 
+    
+    '''
+    file_size = os.path.getsize(local_path)
+    total_parts = math.ceil(file_size / PART_SIZE)
+ 
+    # check to see if file exists in S3, then get how much of it was done already
+    upload_id = find_existing_upload(s3_client, bucket_name, s3_key)
+ 
+    if upload_id:
+        # resume upload
+        done_parts = get_uploaded_parts(s3_client, bucket_name, s3_key, upload_id)
+        print(f"Resuming {s3_key}: {len(done_parts)}/{total_parts} part(s) already uploaded.")
+    else:
+        # create new upload
+        response = s3_client.create_multipart_upload(Bucket=bucket_name, Key=s3_key)
+        upload_id = response["UploadId"]
+        done_parts = {}
+ 
+    # open the file and check each part to see if it already exists in 'done_parts'
+    with open(local_path, "rb") as f:
+        for part_number in range(1, total_parts + 1):
+            if part_number in done_parts:
+                continue  
+ 
+            f.seek((part_number - 1) * PART_SIZE)
+            chunk = f.read(PART_SIZE)
+ 
+            response = s3_client.upload_part(
+                Bucket=bucket_name,
+                Key=s3_key,
+                PartNumber=part_number,
+                UploadId=upload_id,
+                Body=chunk,
+            )
+            # ETag is a hash of the file
+            # keep it for verification later (S3 handles that)
+            done_parts[part_number] = response["ETag"]
+            print(f"  {s3_key}: part {part_number}/{total_parts} uploaded")
+ 
+    # after completing the file, pass S3 a list of all the parts numbers and our ETags for verification
+    parts_list = [{"PartNumber": n, "ETag": done_parts[n]} for n in sorted(done_parts)]
+    s3_client.complete_multipart_upload(
+        Bucket=bucket_name,
+        Key=s3_key,
+        UploadId=upload_id,
+        MultipartUpload={"Parts": parts_list},
+    )
+    print(f"Uploading.. {s3_key} completed")
+ 
+ 
+def find_existing_upload(s3_client, bucket_name, s3_key):
+    # Returns the upload_id of an unfinished multipart upload for this key, or None.
+    response = s3_client.list_multipart_uploads(Bucket=bucket_name, Prefix=s3_key)
+    for upload in response.get("Uploads", []):
+        if upload["Key"] == s3_key:
+            return upload["UploadId"]
+    return None
+ 
+ 
+def get_uploaded_parts(s3_client, bucket_name, s3_key, upload_id):
+    # Returns dictionary for parts S3 already has for this upload_id.
+    # {part_number: ETag}
+    response = s3_client.list_parts(Bucket=bucket_name, Key=s3_key, UploadId=upload_id)
+    return {p["PartNumber"]: p["ETag"] for p in response.get("Parts", [])}
+ 
