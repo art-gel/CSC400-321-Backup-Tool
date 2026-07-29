@@ -35,24 +35,20 @@ config = load_config()
 if not config:
     sys.exit()
 
-# Load config fields
-s3_access_key    = config.get("s3_access_key", "")
-s3_secret_key    = config.get("s3_secret_key", "")
-s3_bucket_name   = config.get("s3_bucket_name", "")
-storage_path     = config.get("storage_path", "")
-schedule         = config.get("schedule", "Daily")
-weekday          = config.get("weekday", "Mon")
-hour             = config.get("hour", "12")
-minute           = config.get("minute", "00")
-ampm             = config.get("ampm", "AM")
-last_backup      = config.get("last_backup", "Never")
-region_name      = config.get("s3_region", "us-east-1")
-endpoint_url     = config.get("s3_endpoint_url", "")
-email_enabled    = config.get("email_enabled", False)
-notify_on_success = config.get("notify_on_success", True)
-notify_on_failure = config.get("notify_on_failure", True)
+aws_access_key = config.get("aws_access_key", "")
+aws_secret_key = config.get("aws_secret_key", "")
+s3_bucket_name = config.get("s3_bucket_name", "")
+storage_path = config.get("storage_path", "")
+schedule = config.get("schedule", "Daily")
+weekday = config.get("weekday", "Mon")
+hour = config.get("hour", "12")
+minute = config.get("minute", "00")
+ampm = config.get("ampm", "AM")
+last_backup = config.get("last_backup", "Never")
+region_name = config.get("region_name", "us-east-1")
+endpoint_url = config.get("endpoint_url", "http://10.0.0.108:4566")
 
-source_drive = "C:"  # let user choose?
+source_drive = "C:" #let user choose?
 target_drive = storage_path[:2]
 
 # Timing
@@ -100,31 +96,15 @@ try:
         json.dump(config_data, f, indent=4)
 
     notify("3-2-1 Backup Tool", "Backup Completed Successfully!")
+    
+    upload_backup(target_drive=target_drive, 
+        aws_access_key_id=aws_access_key, 
+        aws_secret_access_key=aws_secret_key, 
+        region_name=region_name, 
+        bucket_name=s3_bucket_name, 
+        endpoint_url=endpoint_url)
 
-    # S3 Upload
-    upload_backup(
-        target_drive          = target_drive,
-        aws_access_key_id     = s3_access_key,
-        aws_secret_access_key = s3_secret_key,
-        region_name           = region_name,
-        bucket_name           = s3_bucket_name,
-        endpoint_url          = endpoint_url
-    )
-    write_log("S3 upload completed")
     notify("3-2-1 Backup Tool", "Backup Uploaded to Cloud!")
-
-    # Success email
-    if email_enabled and notify_on_success:
-        send_backup_email(
-            success = True,
-            details = (
-                f"Backup completed at {last_backup}\n"
-                f"Duration: {elapsed/60:.1f} minutes\n"
-                f"Storage: {storage_path}\n"
-                f"S3 Bucket: {s3_bucket_name}"
-            )
-        )
-        write_log("Success email sent")
 
 except Exception as e:
     elapsed = time.time() - backup_start
