@@ -4,6 +4,7 @@ from win11toast import toast
 from settings_ui import open_settings
 from WBAdmin_Script import create_image
 from scheduler import Scheduler
+from storage import upload_backup
 
 ctk.set_appearance_mode("Dark")
 
@@ -169,38 +170,45 @@ def run_backup(icon):
 
     source_drive = "C:"  # let user choose?
     target_drive = state.storage_path[:2]
-
-    success = False
+    success = True
     try:
         create_image(source_drive=source_drive, target_drive=target_drive)
         state.last_backup = time.strftime("%Y-%m-%d %H:%M:%S")
         notify("3-2-1 Backup Tool", "Backup Completed Successfully!")
-        write_log("Backup completed successfully")
-        success = True
-
-        # Persist last_backup to JSON immediately so it survives restarts
-        try:
-            with open(CONFIG_FILE, "r") as f:
-                cfg = json.load(f)
-            cfg["last_backup"] = state.last_backup
-            with open(CONFIG_FILE, "w") as f:
-                json.dump(cfg, f, indent=4)
-        except Exception as save_err:
-            write_log(f"Could not save last_backup to config: {save_err}")
-
-
-    except Exception as e:
+    except:
+        success = False
         notify("3-2-1 Backup Tool", "Backup failed.")
-        write_log(f"Backup failed: {e}")
 
-        # Failure email
-        if state.email_enabled and state.notify_on_failure:
-            try:
-                from email_notify import send_backup_email
-                send_backup_email(success=False, details=str(e))
-                write_log("Failure email sent")
-            except Exception as email_err:
-                write_log(f"Failed to send failure email: {email_err}")
+    if success:
+        try:
+            upload_backup(target_drive=target_drive, 
+                aws_access_key_id=state.s3_access_key, 
+                aws_secret_access_key=state.s3_secret_key, 
+                region_name=state.s3_region,
+                bucket_name=state.s3_bucket_name, 
+                endpoint_url=state.s3_endpoint_url)
+
+            notify("3-2-1 Backup Tool", "Backup Uploaded to Cloud!")
+        except:
+            notify("3-2-1 Backup Tool", "Cloud Upload Failed!")
+            success = False
+
+
+    stages = ["Creating Image", "Encrypting", "Uploading to S3", "Finalizing"]
+
+
+    # except Exception as e:
+    #     notify("3-2-1 Backup Tool", "Backup failed.")
+    #     write_log(f"Backup failed: {e}")
+
+    #     # Failure email
+    #     if state.email_enabled and state.notify_on_failure:
+    #         try:
+    #             from email_notify import send_backup_email
+    #             send_backup_email(success=False, details=str(e))
+    #             write_log("Failure email sent")
+    #         except Exception as email_err:
+    #             write_log(f"Failed to send failure email: {email_err}")
 
     elapsed = time.time() - backup_start
     print(f"[BACKUP] Finished: {time.strftime('%H:%M:%S')}")
@@ -223,7 +231,7 @@ def run_backup(icon):
             write_log(f"Failed to send success email: {email_err}")
 
     state.status = "Idle"
-    update_icon(icon)
+    update_icon(icon) 
 
 def on_click(icon_instance, item):
     if str(item) == "Exit":
