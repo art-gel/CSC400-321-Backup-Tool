@@ -180,35 +180,35 @@ def run_backup(icon):
         notify("3-2-1 Backup Tool", "Backup failed.")
 
     if success:
-        #try:
-        if True:
+        try:
             upload_backup(target_drive=target_drive, 
-                aws_access_key_id=state.aws_access_key, 
-                aws_secret_access_key=state.aws_secret_key, 
-                region_name="us-east-1",                   # set in UI
+                aws_access_key_id=state.s3_access_key, 
+                aws_secret_access_key=state.s3_secret_key, 
+                region_name=state.s3_region,
                 bucket_name=state.s3_bucket_name, 
-                endpoint_url="http://10.0.0.108:4566")     # set in UI
+                endpoint_url=state.s3_endpoint_url)
 
             notify("3-2-1 Backup Tool", "Backup Uploaded to Cloud!")
-        #except:
-         #   notify("3-2-1 Backup Tool", "Cloud Upload Failed!")
+        except:
+            notify("3-2-1 Backup Tool", "Cloud Upload Failed!")
+            success = False
 
 
     stages = ["Creating Image", "Encrypting", "Uploading to S3", "Finalizing"]
 
 
-    except Exception as e:
-        notify("3-2-1 Backup Tool", "Backup failed.")
-        write_log(f"Backup failed: {e}")
+    # except Exception as e:
+    #     notify("3-2-1 Backup Tool", "Backup failed.")
+    #     write_log(f"Backup failed: {e}")
 
-        # Failure email
-        if state.email_enabled and state.notify_on_failure:
-            try:
-                from email_notify import send_backup_email
-                send_backup_email(success=False, details=str(e))
-                write_log("Failure email sent")
-            except Exception as email_err:
-                write_log(f"Failed to send failure email: {email_err}")
+    #     # Failure email
+    #     if state.email_enabled and state.notify_on_failure:
+    #         try:
+    #             from email_notify import send_backup_email
+    #             send_backup_email(success=False, details=str(e))
+    #             write_log("Failure email sent")
+    #         except Exception as email_err:
+    #             write_log(f"Failed to send failure email: {email_err}")
 
     elapsed = time.time() - backup_start
     print(f"[BACKUP] Finished: {time.strftime('%H:%M:%S')}")
