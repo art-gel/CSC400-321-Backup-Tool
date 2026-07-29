@@ -1,4 +1,5 @@
 from WBAdmin_Script import create_image
+from email_notify import send_backup_email
 import os, json, sys, time
 from win11toast import toast
 from storage import upload_backup
@@ -49,28 +50,50 @@ endpoint_url = config.get("endpoint_url", "http://10.0.0.108:4566")
 
 source_drive = "C:" #let user choose?
 target_drive = storage_path[:2]
+
+# Timing
+backup_start = time.time()
+print(f"[BACKUP] Started: {time.strftime('%H:%M:%S')}")
+
 try:
     notify("3-2-1 Backup Tool", "Backup Starting")
+    write_log("Backup started")
+
     create_image(source_drive=source_drive, target_drive=target_drive)
 
-    # update last backup
+    # Update last backup time
     last_backup = time.strftime("%Y-%m-%d %H:%M:%S")
 
-    # save config
-    config = {
-        "aws_access_key": aws_access_key,
-        "aws_secret_key": aws_secret_key,
-        "s3_bucket_name": s3_bucket_name,
-        "storage_path": storage_path,
-        "schedule": schedule,
-        "weekday": weekday,
-        "hour": hour,
-        "minute": minute,
-        "ampm": ampm,
-        "last_backup": last_backup
+    elapsed = time.time() - backup_start
+    print(f"[BACKUP] Finished: {time.strftime('%H:%M:%S')}")
+    print(f"[BACKUP] Total:    {elapsed:.2f}s  ({elapsed/60:.2f} min)")
+    write_log(f"Backup completed in {elapsed:.2f}s")
+
+    # Save config with updated last_backup
+    config_data = {
+        "s3_access_key":     s3_access_key,
+        "s3_secret_key":     s3_secret_key,
+        "s3_bucket_name":    s3_bucket_name,
+        "storage_path":      storage_path,
+        "schedule":          schedule,
+        "weekday":           weekday,
+        "hour":              hour,
+        "minute":            minute,
+        "ampm":              ampm,
+        "last_backup":       last_backup,
+        "s3_region":         region_name,
+        "s3_endpoint_url":   endpoint_url,
+        "email_enabled":     email_enabled,
+        "email_recipient":   config.get("email_recipient", ""),
+        "email_sender":      config.get("email_sender", ""),
+        "email_password":    config.get("email_password", ""),
+        "notify_on_success": notify_on_success,
+        "notify_on_failure": notify_on_failure,
+        "notify_on_missed":  config.get("notify_on_missed", True),
+        "auto_backup":       config.get("auto_backup", True),
     }
     with open(CONFIG_FILE, "w") as f:
-        json.dump(config, f, indent=4)
+        json.dump(config_data, f, indent=4)
 
     notify("3-2-1 Backup Tool", "Backup Completed Successfully!")
     
@@ -84,8 +107,14 @@ try:
     notify("3-2-1 Backup Tool", "Backup Uploaded to Cloud!")
 
 except Exception as e:
+    elapsed = time.time() - backup_start
     notify("3-2-1 Backup Tool", "Backup Failed")
     write_log(f"Scheduled backup failed: {e}")
 
-
-
+    # Failure email
+    if email_enabled and notify_on_failure:
+        try:
+            send_backup_email(success=False, details=str(e))
+            write_log("Failure email sent")
+        except Exception as email_err:
+            write_log(f"Failed to send failure email: {email_err}")
