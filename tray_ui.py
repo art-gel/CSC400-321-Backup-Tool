@@ -1,4 +1,4 @@
-import pystray, PIL.Image, threading, time, os, json
+import pystray, PIL.Image, threading, time, os, json, sys, ctypes
 import customtkinter as ctk
 from win11toast import toast
 from settings_ui import open_settings
@@ -254,7 +254,19 @@ def launch_settings_from_menu(icon_instance, item):
 root = ctk.CTk()
 root.withdraw()  # this root is never shown directly
 
+def is_admin():
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    except Exception:
+        return False
+
+def is_windows():
+    return sys.platform.startswith("win")
+
 def main():
+    if not is_windows() or not is_admin():
+        sys.exit(0)
+
     has_config = load_state_into_app()
 
     if not has_config:
