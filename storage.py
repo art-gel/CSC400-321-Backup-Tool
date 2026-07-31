@@ -101,7 +101,10 @@ def upload_backup(target_drive, aws_access_key_id, aws_secret_access_key, region
     client_config = Config(
         retries={'max_attempts': 3},
         read_timeout=300,  # Increase to 5 minutes
-        connect_timeout=300
+        connect_timeout=300,
+        request_checksum_calculation='when_required',
+        response_checksum_validation='when_required',
+        s3={'addressing_style': 'path'}
     )
 
     s3_client = boto3.client("s3", 
