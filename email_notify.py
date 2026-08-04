@@ -46,7 +46,6 @@ def send_backup_email(success: bool, details: str = ""):
     subject = "✓ Backup Completed Successfully" if success else "✗ Backup Failed"
     body = (
         f"Your 3-2-1 Backup Tool has completed a backup.\n\n"
-        f"Status: Success\n"
         f"{details}\n\n"
         f"— 3-2-1 Backup Tool"
     ) if success else (

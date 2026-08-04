@@ -170,14 +170,35 @@ def run_backup(icon):
 
     source_drive = "C:"  # let user choose?
     target_drive = state.storage_path[:2]
-    success = True
+
+    success = False
     try:
         create_image(source_drive=source_drive, target_drive=target_drive)
         state.last_backup = time.strftime("%Y-%m-%d %H:%M:%S")
         notify("3-2-1 Backup Tool", "Backup Completed Successfully!")
-    except:
-        success = False
+        write_log("Backup completed successfully")
+        success = True
+
+        try:
+            with open(CONFIG_FILE, "r") as f:
+                cfg = json.load(f)
+            cfg["last_backup"] = state.last_backup
+            with open(CONFIG_FILE, "w") as f:
+                json.dump(cfg, f, indent=4)
+        except Exception as save_err:
+            write_log(f"Could not save last_backup to config: {save_err}")
+
+    except Exception as e:
         notify("3-2-1 Backup Tool", "Backup failed.")
+        write_log(f"Backup failed: {e}")
+
+        if state.email_enabled and state.notify_on_failure:
+            try:
+                from email_notify import send_backup_email
+                send_backup_email(success=False, details=str(e))
+                write_log("Failure email sent")
+            except Exception as email_err:
+                write_log(f"Failed to send failure email: {email_err}")
 
     if success:
         try:
@@ -187,40 +208,22 @@ def run_backup(icon):
                 region_name=state.s3_region,
                 bucket_name=state.s3_bucket_name, 
                 endpoint_url=state.s3_endpoint_url)
-
             notify("3-2-1 Backup Tool", "Backup Uploaded to Cloud!")
-        except:
+            write_log("S3 upload completed")
+        except Exception as upload_err:
             notify("3-2-1 Backup Tool", "Cloud Upload Failed!")
-            success = False
-
-
-    stages = ["Creating Image", "Encrypting", "Uploading to S3", "Finalizing"]
-
-
-    # except Exception as e:
-    #     notify("3-2-1 Backup Tool", "Backup failed.")
-    #     write_log(f"Backup failed: {e}")
-
-    #     # Failure email
-    #     if state.email_enabled and state.notify_on_failure:
-    #         try:
-    #             from email_notify import send_backup_email
-    #             send_backup_email(success=False, details=str(e))
-    #             write_log("Failure email sent")
-    #         except Exception as email_err:
-    #             write_log(f"Failed to send failure email: {email_err}")
+            write_log(f"S3 upload failed: {upload_err}")
 
     elapsed = time.time() - backup_start
     print(f"[BACKUP] Finished: {time.strftime('%H:%M:%S')}")
     print(f"[BACKUP] Total:    {elapsed:.2f}s  ({elapsed/60:.2f} min)")
 
-    # Success email
     if success and state.email_enabled and state.notify_on_success:
         try:
             from email_notify import send_backup_email
             send_backup_email(
-                success = True,
-                details = (
+                success=True,
+                details=(
                     f"Backup completed at {state.last_backup}\n"
                     f"Duration: {elapsed/60:.1f} minutes\n"
                     f"Storage: {state.storage_path}"
