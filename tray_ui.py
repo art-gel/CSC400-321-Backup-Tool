@@ -138,7 +138,7 @@ def notify(title, message):
 
 def write_log(message):
     with open(LOG_FILE, "a") as f:
-        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = time.strftime("%Y-%m-%d %#I:%M %p")
         f.write(f"[{timestamp}] {message}\n")
 
 # Updates the system tray tooltip with current backup information
