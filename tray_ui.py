@@ -224,7 +224,6 @@ def run_backup(icon):
             send_backup_email(
                 success=True,
                 details=(
-                    f"Backup completed at {state.last_backup}\n"
                     f"Duration: {elapsed/60:.1f} minutes\n"
                     f"Storage: {state.storage_path}"
                 )
