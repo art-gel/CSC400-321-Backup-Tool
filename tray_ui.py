@@ -174,7 +174,7 @@ def run_backup(icon):
     success = False
     try:
         create_image(source_drive=source_drive, target_drive=target_drive)
-        state.last_backup = time.strftime("%Y-%m-%d %H:%M:%S")
+        state.last_backup = time.strftime("%Y-%m-%d %I:%M %p")
         notify("3-2-1 Backup Tool", "Backup Completed Successfully!")
         write_log("Backup completed successfully")
         success = True
