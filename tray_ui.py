@@ -1,10 +1,10 @@
-import pystray, PIL.Image, threading, time, os, json
+import pystray, PIL.Image, threading, time, os, json, sys, ctypes
 import customtkinter as ctk
 from win11toast import toast
 from settings_ui import open_settings
 from WBAdmin_Script import create_image
 from scheduler import Scheduler
-from storage import upload_backup
+from storage import upload_backup, restore_backup, has_incomplete_uploads
 
 ctk.set_appearance_mode("Dark")
 
@@ -35,6 +35,7 @@ class BackupState:
         self.notify_on_success = True
         self.notify_on_failure = True
         self.notify_on_missed  = True
+        self.password = 'password'
 
 state = BackupState()
 
@@ -70,6 +71,7 @@ def save_config():
         "notify_on_success": state.notify_on_success,
         "notify_on_failure": state.notify_on_failure,
         "notify_on_missed":  state.notify_on_missed,
+        "password":  state.password
     }
     with open(CONFIG_FILE, "w") as f:
         json.dump(config, f, indent=4)
@@ -207,7 +209,9 @@ def run_backup(icon):
                 aws_secret_access_key=state.s3_secret_key, 
                 region_name=state.s3_region,
                 bucket_name=state.s3_bucket_name, 
-                endpoint_url=state.s3_endpoint_url)
+                endpoint_url=state.s3_endpoint_url, 
+                password=state.password)
+
             notify("3-2-1 Backup Tool", "Backup Uploaded to Cloud!")
             write_log("S3 upload completed")
         except Exception as upload_err:
@@ -253,10 +257,41 @@ def open_logs(icon_instance, item):
 def launch_settings_from_menu(icon_instance, item):
     root.after(0, lambda: open_settings(icon_instance, state, update_icon, root))
 
+def run_upload_backup(icon_instance, item):
+    upload_backup(target_drive=state.storage_path[:2], 
+                aws_access_key_id=state.s3_access_key, 
+                aws_secret_access_key=state.s3_secret_key, 
+                region_name=state.s3_region,
+                bucket_name=state.s3_bucket_name, 
+                endpoint_url=state.s3_endpoint_url, 
+                password=state.password)
+
+def run_restore_file(icon_instance, item):
+    restore_backup(target_drive=state.storage_path[:2],
+                bucket_name=state.s3_bucket_name,
+                region_name=state.s3_region,
+                endpoint_url=state.s3_endpoint_url,
+                password=state.password,
+                aws_access_key_id=state.s3_access_key,
+                aws_secret_access_key=state.s3_secret_key
+                )
+
 root = ctk.CTk()
 root.withdraw()  # this root is never shown directly
 
+def is_admin():
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    except Exception:
+        return False
+
+def is_windows():
+    return sys.platform.startswith("win")
+
 def main():
+    if not is_windows() or not is_admin():
+        sys.exit(0)
+
     has_config = load_state_into_app()
 
     if not has_config:
@@ -266,6 +301,21 @@ def main():
             print("Setup canceled. Exiting tool.")
             exit()
         load_state_into_app()
+    else:
+        if has_incomplete_uploads(
+            aws_access_key_id=state.s3_access_key,
+            aws_secret_access_key=state.s3_secret_key,
+            region_name=state.s3_region,
+            bucket_name=state.s3_bucket_name,
+            endpoint_url=state.s3_endpoint_url
+        ):
+            upload_backup(target_drive=state.storage_path[:2], 
+                aws_access_key_id=state.s3_access_key, 
+                aws_secret_access_key=state.s3_secret_key, 
+                region_name=state.s3_region,
+                bucket_name=state.s3_bucket_name, 
+                endpoint_url=state.s3_endpoint_url, 
+                password=state.password)
 
     # Initialize the system tray icon
     icon = pystray.Icon(
@@ -273,6 +323,9 @@ def main():
         image,
         menu=pystray.Menu(
             pystray.MenuItem("Run Backup Now", on_click),
+            pystray.MenuItem("Run Upload Now", run_upload_backup),
+            pystray.MenuItem("Run Restore Now", run_restore_file),
+            pystray.Menu.SEPARATOR,
             pystray.MenuItem("Settings", launch_settings_from_menu),
             pystray.MenuItem("View Logs", open_logs),
             pystray.Menu.SEPARATOR,
