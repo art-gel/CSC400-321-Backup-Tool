@@ -92,8 +92,11 @@ def is_valid_minute(value):
 def validate_access_key(value):
     value = (value or "").strip()
 
-    if not re.match(r"^[A-Z0-9]{20}$", value):
-        return False, "Access Key must be exactly 20 uppercase alphanumeric characters."
+    if not value:
+        return False, "Access Key is required."
+
+    if len(value) != 24:
+        return False, "Access Key must be exactly 24 characters."
 
     if len(set(value)) == 1:
         return False, "Access Key cannot consist of the same repeating character."
@@ -128,9 +131,7 @@ def validate_bucket_name(value):
 # Field requirement hints (? hint)
 FIELD_HINTS = {
     "access_key": [
-        "· Exactly 20 characters",
-        "· Uppercase letters and numbers only",
-        "· Usually starts with AKIA",
+        "· Exactly 24 characters",
     ],
     "secret_key": [
         "· Exactly 40 characters",
