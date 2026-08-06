@@ -281,3 +281,32 @@ def restore_backup(target_drive, bucket_name, region_name, endpoint_url, passwor
 
     print(f"Restore complete: {restored_count} file(s) restored to {final_folder}")
     return final_folder
+
+def get_incomplete_uploads(s3_client, bucket_name):
+    # ask S3 which multipart uploads are still in progress
+    incomplete_keys = set()
+    paginator = s3_client.get_paginator("list_multipart_uploads")
+    for page in paginator.paginate(Bucket=bucket_name):
+        for upload in page.get("Uploads", []):
+            incomplete_keys.add(upload["Key"])
+    return incomplete_keys
+
+def has_incomplete_uploads(aws_access_key_id, aws_secret_access_key, region_name, bucket_name, endpoint_url):
+    # return bool
+    client_config = Config(
+        retries={'max_attempts': 3},
+        read_timeout=300,
+        connect_timeout=300,
+        request_checksum_calculation='when_required',
+        response_checksum_validation='when_required',
+        s3={'addressing_style': 'path'}
+    )
+
+    s3_client = boto3.client("s3",
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key,
+        region_name=region_name,
+        endpoint_url=endpoint_url,
+        config=client_config)
+
+    return bool(get_incomplete_uploads(s3_client, bucket_name))

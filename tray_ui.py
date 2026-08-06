@@ -4,7 +4,7 @@ from win11toast import toast
 from settings_ui import open_settings
 from WBAdmin_Script import create_image
 from scheduler import Scheduler
-from storage import upload_backup, restore_backup
+from storage import upload_backup, restore_backup, has_incomplete_uploads
 
 ctk.set_appearance_mode("Dark")
 
@@ -298,6 +298,21 @@ def main():
             print("Setup canceled. Exiting tool.")
             exit()
         load_state_into_app()
+    else:
+        if has_incomplete_uploads(
+            aws_access_key_id=state.s3_access_key,
+            aws_secret_access_key=state.s3_secret_key,
+            region_name=state.s3_region,
+            bucket_name=state.s3_bucket_name,
+            endpoint_url=state.s3_endpoint_url
+        ):
+            upload_backup(target_drive=state.storage_path[:2], 
+                aws_access_key_id=state.s3_access_key, 
+                aws_secret_access_key=state.s3_secret_key, 
+                region_name=state.s3_region,
+                bucket_name=state.s3_bucket_name, 
+                endpoint_url=state.s3_endpoint_url, 
+                password=state.password)
 
     # Initialize the system tray icon
     icon = pystray.Icon(
